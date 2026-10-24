@@ -1,0 +1,6 @@
+{
+  "name": "CivilEdge IAS",
+  "description": "UPSC CSE live classroom, bilingual prelims test series, AI mains answer evaluation lab, academic resource library, and micro-syllabus tracker integrated with Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
