@@ -99,7 +99,7 @@ export function BroadcastSchedulerModal({
   open,
   onClose,
   onCreate,
-  defaultFacultyName = 'Kshitiz (Admin/Faculty)',
+  defaultFacultyName = 'CivilEdge Faculty',
 }: BroadcastSchedulerModalProps) {
   const [broadcastMode, setBroadcastMode] = useState<'live' | 'scheduled'>('live');
   const [title, setTitle] = useState('');
@@ -221,7 +221,7 @@ export function BroadcastSchedulerModal({
       await onCreate({
         title: title.trim() || `Live ${subject} Faculty Seminar`,
         subject,
-        faculty: faculty.trim() || 'Kshitiz (Admin/Faculty)',
+        faculty: faculty.trim() || defaultFacultyName || 'CivilEdge Faculty',
         facultyDesignation: facultyDesignation.trim() || undefined,
         source,
         streamUrl: streamUrl.trim(),
@@ -470,7 +470,7 @@ export function BroadcastSchedulerModal({
                 required
                 value={faculty}
                 onChange={(e) => setFaculty(e.target.value)}
-                placeholder="Kshitiz (Admin/Faculty)"
+                placeholder="Dr. S. Sharma / Faculty Mentor"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none"
               />
             </div>

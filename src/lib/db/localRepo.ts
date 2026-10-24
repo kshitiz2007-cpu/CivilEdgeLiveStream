@@ -1,5 +1,7 @@
 import { buildSeed } from '../../data/seed';
 import { SEED_INFOGRAPHICS } from '../../data/infographics';
+import { isAdminEmail } from '../../hooks/useAuth';
+import { deleteBlob, getBlob, storeBlob } from './blobStore';
 import {
   buildResourceSynopsisMarkdown,
   buildTopicBriefMarkdown,
@@ -101,11 +103,11 @@ function buildInitialStore(): SandboxStore {
     questionMap[q.id] = q;
   }
 
-  // Admin user: Kshitiz2007@gmail.com with pristine slate
+  // Admin Director user with clean slate
   const defaultProfile: UserProfileData = {
     uid: '00000000-0000-4000-8000-000000000001',
-    displayName: 'Kshitiz (Admin/Faculty)',
-    email: 'kshitiz2007@gmail.com',
+    displayName: 'CivilEdge Faculty Director',
+    email: 'admin@civiledge.in',
     targetYear: '2026',
     optionalSubject: 'Public Administration',
     streakDays: 1,
@@ -137,7 +139,7 @@ function buildInitialStore(): SandboxStore {
         actorId: defaultProfile.uid,
         tableName: 'system',
         operation: 'INITIALIZE_CLEAN_SLATE',
-        rowId: 'admin-kshitiz',
+        rowId: 'admin-seed',
         createdAt: nowIso,
       },
     ],
@@ -162,10 +164,10 @@ function sanitizeStore(store: SandboxStore): SandboxStore {
     store.attempts = [];
     changed = true;
   }
-  // Guarantee Kshitiz2007@gmail.com has admin role
+  // Guarantee admin accounts have admin role
   if (!store.profiles) store.profiles = {};
   for (const prof of Object.values(store.profiles)) {
-    if (prof.email?.toLowerCase() === 'kshitiz2007@gmail.com') {
+    if (isAdminEmail(prof.email)) {
       if (prof.role !== 'admin') {
         prof.role = 'admin';
         changed = true;
@@ -209,7 +211,25 @@ function writeStore(next: SandboxStore, broadcast = true) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    // ignore
+    try {
+      const pruned = {
+        ...next,
+        topics: next.topics.map((t) => ({
+          ...t,
+          infographics: (t.infographics ?? []).map((info) => ({
+            ...info,
+            url: info.url.startsWith('data:') && info.url.length > 50000 ? `idb://topic-info-${info.id}` : info.url,
+          })),
+        })),
+        resources: next.resources.map((r) => ({
+          ...r,
+          fileData: r.fileData && r.fileData.length > 50000 ? undefined : r.fileData,
+        })),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+    } catch {
+      // Memory fallback retains full object in RAM
+    }
   }
   if (broadcast) notifyAll();
 }
@@ -285,20 +305,20 @@ export const localRepo: DataRepo = {
 
   async getProfile(user) {
     const store = readStore();
-    const isKshitiz = user.email?.toLowerCase() === 'kshitiz2007@gmail.com';
+    const isAdmin = isAdminEmail(user.email) || user.role === 'admin';
     const existing = store.profiles[user.id];
     if (existing) {
-      if (isKshitiz && existing.role !== 'admin') {
+      if (isAdmin && existing.role !== 'admin') {
         existing.role = 'admin';
-        existing.displayName = existing.displayName || 'Kshitiz (Admin/Faculty)';
+        existing.displayName = existing.displayName || user.displayName || 'Faculty Director';
       }
       const normalized = normalizeProfile(existing);
       if (
         normalized.studyMinutes !== existing.studyMinutes ||
         normalized.streakDays !== existing.streakDays ||
-        (isKshitiz && normalized.role !== 'admin')
+        (isAdmin && normalized.role !== 'admin')
       ) {
-        if (isKshitiz) normalized.role = 'admin';
+        if (isAdmin) normalized.role = 'admin';
         store.profiles[user.id] = normalized;
         writeStore(store);
       }
@@ -306,15 +326,15 @@ export const localRepo: DataRepo = {
     }
     const created: UserProfileData = {
       uid: user.id,
-      displayName: isKshitiz ? 'Kshitiz (Admin/Faculty)' : user.displayName || 'Aspirant',
+      displayName: user.displayName || (isAdmin ? 'Faculty Director' : 'Aspirant'),
       email: user.email,
       photoURL: user.photoURL,
       targetYear: '2026',
-      optionalSubject: isKshitiz ? 'Public Administration' : 'Sociology',
+      optionalSubject: isAdmin ? 'Public Administration' : 'Sociology',
       streakDays: 1,
       studyMinutes: 0,
       targetMinutes: 360,
-      role: isKshitiz ? 'admin' : (user.role || 'aspirant'),
+      role: isAdmin ? 'admin' : (user.role || 'aspirant'),
       lastStudyDate: todayIST(),
     };
     store.profiles[user.id] = created;
@@ -381,7 +401,7 @@ export const localRepo: DataRepo = {
     const created: BroadcastClass = {
       id: makeId('broadcast'),
       ...payload,
-      viewersCount: payload.status === 'live' ? 124 : 0,
+      viewersCount: payload.status === 'live' ? 1 : 0,
       createdAt: new Date().toISOString(),
     };
     store.broadcasts.unshift(created);
@@ -420,7 +440,7 @@ export const localRepo: DataRepo = {
   joinClassroomPresence(broadcastId, _viewerKey, onCount): Unsubscribe {
     const store = readStore();
     const cls = store.broadcasts.find((b) => b.id === broadcastId);
-    const base = cls?.status === 'live' ? Math.max(18, cls.viewersCount ?? 142) : 1;
+    const base = cls?.status === 'live' ? Math.max(1, cls.viewersCount ?? 1) : 0;
     onCount(base);
     return () => {};
   },
@@ -636,8 +656,29 @@ export const localRepo: DataRepo = {
   async listSubmissions(userId) {
     const store = readStore();
     return store.submissions
-      .filter((s) => !s.userId || s.userId === userId)
+      .filter((s) => !userId || !s.userId || s.userId === userId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  async listAllSubmissions() {
+    const store = readStore();
+    return [...store.submissions].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  },
+
+  async gradeMainsSubmission(submissionId, score, feedback, evaluation) {
+    const store = readStore();
+    const sub = store.submissions.find((s) => s.id === submissionId);
+    if (!sub) throw new Error('Submission not found.');
+    sub.score = score;
+    sub.feedback = feedback;
+    sub.status = 'evaluated';
+    if (evaluation) {
+      sub.evaluation = evaluation;
+    }
+    writeStore(store);
+    return { ...sub };
   },
 
   async submitAndEvaluateMains(userId, question, answerText) {
@@ -778,6 +819,7 @@ export const localRepo: DataRepo = {
 
     if (payload.file) {
       filePath = `sandbox://resources/${id}/${payload.file.name}`;
+      void storeBlob(filePath, payload.file);
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         blobUrls.set(filePath, URL.createObjectURL(payload.file));
       }
@@ -785,6 +827,9 @@ export const localRepo: DataRepo = {
 
     const moderationStatus: ModerationStatus =
       isStaff && payload.autoApprove !== false ? 'approved' : 'pending';
+
+    const safeFileData =
+      payload.fileData && payload.fileData.length < 65536 ? payload.fileData : undefined;
 
     const item: ResourceItem = {
       id,
@@ -800,7 +845,7 @@ export const localRepo: DataRepo = {
       summary: payload.summary.trim(),
       topicsCovered: payload.topicsCovered,
       filePath,
-      fileData: payload.fileData,
+      fileData: safeFileData,
       isUserUploaded: !isStaff || payload.category === 'user',
       moderationStatus,
       uploadedBy: viewerId,
@@ -825,6 +870,11 @@ export const localRepo: DataRepo = {
 
   async deleteResource(id) {
     const store = readStore();
+    const item = store.resources.find((r) => r.id === id);
+    if (item?.filePath) {
+      void deleteBlob(item.filePath);
+      blobUrls.delete(item.filePath);
+    }
     store.resources = store.resources.filter((r) => r.id !== id);
     recordAudit(store, undefined, 'resources', 'DELETE', id);
     writeStore(store);
@@ -838,7 +888,14 @@ export const localRepo: DataRepo = {
       writeStore(store);
     }
     const downloads = found ? found.downloads : item.downloads + 1;
-    const signedUrl = item.filePath ? blobUrls.get(item.filePath) ?? null : null;
+    let signedUrl = item.filePath ? blobUrls.get(item.filePath) ?? null : null;
+    if (!signedUrl && item.filePath) {
+      const persistedBlob = await getBlob(item.filePath);
+      if (persistedBlob && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        signedUrl = URL.createObjectURL(persistedBlob);
+        blobUrls.set(item.filePath, signedUrl);
+      }
+    }
     const imageUrl =
       item.format === 'jpg' || item.format === 'png'
         ? item.fileData || signedUrl || null

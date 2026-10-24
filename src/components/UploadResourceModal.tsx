@@ -26,7 +26,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
   open,
   onClose,
   onUpload,
-  defaultAuthor = 'CivilEdge Faculty Bureau / Kshitiz',
+  defaultAuthor = 'CivilEdge Faculty Bureau',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,12 +80,16 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     }
 
-    // Generate preview data URL
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreviewDataUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // For images, generate base64 data URL for preview; for PDFs, generate lightweight Object URL
+    if (detectedFormat === 'jpg') {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPreviewDataUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      setPreviewDataUrl(URL.createObjectURL(file));
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {

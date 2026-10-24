@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Calendar, Cloud, Layers, Radio, Shield } from 'lucide-react';
+import { BookOpen, Calendar, Layers, Radio, Shield } from 'lucide-react';
+import { AdminDashboard } from './components/AdminDashboard';
 import { AdminStudioModal, type AdminTab } from './components/AdminStudioModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BroadcastSchedulerModal } from './components/BroadcastSchedulerModal';
@@ -146,12 +147,7 @@ export function App() {
         onGoogleSignIn={auth.signInWithGoogle}
         onPasswordReset={auth.sendPasswordReset}
         onEnterSandbox={auth.enterSandboxMode}
-        cloudAuthAvailable={isSupabaseConfigured || import.meta.env.DEV}
-        onDemoCloudSignIn={
-          import.meta.env.DEV && !isSupabaseConfigured
-            ? auth.signInWithDemoCloudUser
-            : undefined
-        }
+        onDemoCloudSignIn={auth.signInWithDemoCloudUser}
       />
     );
   }
@@ -183,9 +179,10 @@ export function App() {
         }}
         onOpenPortal={() => setPortalOpen(true)}
         userDisplayName={profile.displayName}
+        isStaff={isStaff}
       />
 
-      {/* Contextual Workspace Sub-Toolbar with 1-Click Architecture Switcher */}
+      {/* Contextual Workspace Sub-Toolbar */}
       <div className="border-b border-slate-200/90 bg-white/80 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-3 text-slate-600">
@@ -193,7 +190,7 @@ export function App() {
             <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-xs">
               <button
                 type="button"
-                onClick={auth.setModeOptionA}
+                onClick={() => auth.signInWithDemoCloudUser('aspirant')}
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-semibold text-xs transition-all cursor-pointer ${
                   auth.isCloudAuth
                     ? 'bg-white border border-emerald-400 text-emerald-800 shadow-xs'
@@ -307,13 +304,13 @@ export function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setAdminInitialTab('quiz');
+                  setAdminInitialTab('supabase');
                   setAdminStudioOpen(true);
                 }}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-800 hover:text-amber-800 shadow-xs cursor-pointer"
               >
                 <Shield className="w-3.5 h-3.5 text-amber-600" />
-                Admin Studio
+                <span>Admin Dashboard</span>
               </button>
             ) : null}
           </div>
@@ -495,6 +492,37 @@ export function App() {
             />
           )
         ) : null}
+
+        {activeTab === 'admin' && isStaff ? (
+          <AdminDashboard
+            repo={repo}
+            profile={profile}
+            topics={topics}
+            broadcasts={broadcasts}
+            quizzes={quizzes}
+            mainsQuestions={mainsQuestions}
+            submissions={submissions}
+            resources={resources}
+            onOpenBroadcastScheduler={() => setSchedulerOpen(true)}
+            onRefreshAll={hydrateWorkspace}
+            onSelectBroadcast={(b) => {
+              setSelectedBroadcastId(b.id);
+              setClassroomMode('stage');
+              setActiveTab('classroom');
+            }}
+            onOpenResourceDoc={async (item) => {
+              const { doc, downloads } = await repo.openResource(item);
+              setResources((prev) =>
+                prev.map((r) => (r.id === item.id ? { ...r, downloads } : r))
+              );
+              setReaderDoc(doc);
+            }}
+            onOpenTopicBrief={async (t) => {
+              const doc = await repo.openTopicBrief(t);
+              setReaderDoc(doc);
+            }}
+          />
+        ) : null}
       </main>
 
       {/* Modals & Drawers */}
@@ -512,20 +540,8 @@ export function App() {
           const updated = await repo.logStudyMinutes(profile.uid, mins);
           setProfile(updated);
         }}
-        onSwitchSandboxRole={
-          repo.setSandboxRole
-            ? async (role) => {
-                const updated = await repo.setSandboxRole!(profile.uid, role);
-                setProfile(updated);
-                const staff = updated.role === 'admin' || updated.role === 'mentor';
-                setQuizzes(await repo.listQuizzes(staff));
-                setResources(await repo.listResources(updated.uid, staff));
-              }
-            : undefined
-        }
         onOpenAdminStudio={() => {
-          setAdminInitialTab('quiz');
-          setAdminStudioOpen(true);
+          setActiveTab('admin');
         }}
         onExitSandboxToCloud={auth.exitSandboxMode}
         onSignOut={auth.signOut}

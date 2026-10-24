@@ -19,6 +19,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { InfographicItem } from '../types/index.ts';
+import { storeBlob, getBlob } from '../lib/db/blobStore';
 
 interface DailyCruxCarouselProps {
   topicId: string;
@@ -47,6 +48,7 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
   const [newCaption, setNewCaption] = useState('');
   const [newSource, setNewSource] = useState('CivilEdge Editorial & Analytical Bureau');
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string | null>(null);
+  const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -55,6 +57,32 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
   const total = infographics.length;
   const safeIndex = total > 0 ? Math.min(currentIndex, total - 1) : 0;
   const currentSlide = total > 0 ? infographics[safeIndex] : null;
+
+  const [resolvedSlideUrl, setResolvedSlideUrl] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    if (!currentSlide?.url) {
+      setResolvedSlideUrl('');
+      return;
+    }
+    if (currentSlide.url.startsWith('idb://')) {
+      const key = currentSlide.url.replace('idb://', '');
+      getBlob(key).then((blob) => {
+        if (!active) return;
+        if (blob) {
+          setResolvedSlideUrl(URL.createObjectURL(blob));
+        } else {
+          setResolvedSlideUrl(currentSlide.url);
+        }
+      }).catch(() => {
+        if (active) setResolvedSlideUrl(currentSlide.url);
+      });
+    } else {
+      setResolvedSlideUrl(currentSlide.url);
+    }
+    return () => { active = false; };
+  }, [currentSlide?.url]);
 
   const nextSlide = () => {
     if (total <= 1) return;
@@ -85,6 +113,7 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
       setUploadError('Please select a JPG, PNG, or SVG image.');
       return;
     }
+    setSelectedFileObj(file);
     setFileName(file.name);
     if (!newTitle.trim()) {
       const clean = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
@@ -112,8 +141,12 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
     setUploadError(null);
 
     try {
+      const infoId = `info-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      if (selectedFileObj) {
+        void storeBlob(`topic-info-${infoId}`, selectedFileObj);
+      }
       const newSlide: InfographicItem = {
-        id: `info-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: infoId,
         url: selectedFileDataUrl,
         title: newTitle.trim(),
         caption: newCaption.trim() || undefined,
@@ -128,6 +161,7 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
       setNewTitle('');
       setNewCaption('');
       setSelectedFileDataUrl(null);
+      setSelectedFileObj(null);
       setFileName('');
     } catch (err: any) {
       setUploadError(err.message || 'Failed to save infographic.');
@@ -194,7 +228,7 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
           {/* Main Slide Viewer */}
           <div className="relative min-h-[300px] sm:min-h-[420px] max-h-[580px] bg-gradient-to-b from-slate-100/70 to-slate-50 flex items-center justify-center p-3 sm:p-6 select-none overflow-hidden">
             <img
-              src={currentSlide.url}
+              src={resolvedSlideUrl || currentSlide.url}
               alt={currentSlide.title}
               className="max-h-[520px] w-auto max-w-full object-contain rounded-xl shadow-md transition-all duration-300 cursor-zoom-in border border-slate-200/80 bg-white"
               onClick={() => {
@@ -387,7 +421,7 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
           {/* Lightbox Image Stage */}
           <div className="flex-1 overflow-auto flex items-center justify-center p-4">
             <img
-              src={currentSlide.url}
+              src={resolvedSlideUrl || currentSlide.url}
               alt={currentSlide.title}
               style={{ transform: `scale(${lightboxZoom})`, transformOrigin: 'center center' }}
               className="max-h-[82vh] max-w-full object-contain transition-transform duration-150 rounded-xl shadow-2xl"
@@ -445,6 +479,11 @@ export const DailyCruxCarousel: React.FC<DailyCruxCarouselProps> = ({
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files?.[0]) handleFileChange(e.dataTransfer.files[0]);
+                  }}
                   className="border-2 border-dashed border-slate-300 hover:border-amber-500 bg-slate-50/80 rounded-2xl p-4 text-center cursor-pointer transition-all"
                 >
                   <input

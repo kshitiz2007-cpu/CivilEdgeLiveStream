@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, Cloud, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, KeyRound, Mail, ShieldCheck } from 'lucide-react';
 
 type AuthTab = 'signin' | 'signup' | 'magic' | 'reset';
 
@@ -10,7 +10,6 @@ interface AuthScreenProps {
   onGoogleSignIn: () => Promise<void>;
   onPasswordReset: (email: string) => Promise<void>;
   onEnterSandbox: () => void;
-  cloudAuthAvailable?: boolean;
   onDemoCloudSignIn?: (role: 'aspirant' | 'admin') => void;
 }
 
@@ -21,7 +20,6 @@ export function AuthScreen({
   onGoogleSignIn,
   onPasswordReset,
   onEnterSandbox,
-  cloudAuthAvailable = true,
   onDemoCloudSignIn,
 }: AuthScreenProps) {
   const [tab, setTab] = useState<AuthTab>('signin');
@@ -72,19 +70,19 @@ export function AuthScreen({
             <span className="font-serif text-2xl font-bold tracking-tight text-slate-900">
               CivilEdge <span className="text-amber-600">IAS</span>
             </span>
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase text-emerald-800">
-              Option A: Supabase Cloud
+            <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase text-amber-900">
+              UPSC CSE 2026–27
             </span>
           </div>
 
           <p className="mt-8 text-xs uppercase tracking-widest text-amber-700 font-semibold">
-            UPSC Civil Services Examination · 2026–27 Cohort
+            Official Aspirant &amp; Faculty Portal
           </p>
           <h1 className="mt-3 font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
             Disciplined preparation for Prelims, Mains &amp; Live Faculty Seminars.
           </h1>
           <p className="mt-4 text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
-            Synchronize your micro-syllabus completion, bilingual Prelims accuracy (+2 / -0.66), rubric-scored Mains answers, and timestamped lecture notes across devices via Supabase Cloud.
+            Synchronize your micro-syllabus completion, bilingual Prelims accuracy (+2 / -0.66), rubric-scored Mains answers, and timestamped lecture notes across all your devices.
           </p>
 
           <dl className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
@@ -100,10 +98,10 @@ export function AuthScreen({
             <div>
               <dt className="font-bold text-slate-900 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-amber-600" />
-                Row-Level Protected Records
+                Secure Academic Records
               </dt>
               <dd className="mt-1 text-slate-600 text-xs leading-relaxed">
-                Every lecture note, study streak log, and Mains evaluation copy is isolated to your authenticated Supabase UID.
+                Every lecture note, study streak log, and Mains evaluation copy is isolated and encrypted to your account.
               </dd>
             </div>
           </dl>
@@ -111,26 +109,13 @@ export function AuthScreen({
 
         <div className="mt-10 pt-6 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
           <span>GS-1 to GS-4 · CSAT · Essay · Optional</span>
-          <button
-            type="button"
-            onClick={onEnterSandbox}
-            className="inline-flex items-center gap-1.5 text-amber-700 hover:text-amber-800 font-bold cursor-pointer"
-          >
-            Switch to Option B: Offline Sandbox
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <span className="text-slate-600 font-medium">CivilEdge IAS Academy · Pan-India Online Digital Learning</span>
         </div>
       </div>
 
-      {/* Authentication Form Column (Option A Preview) */}
+      {/* Authentication Form Column */}
       <div className="lg:w-1/2 p-8 sm:p-12 lg:p-16 flex items-center justify-center bg-white">
         <div className="w-full max-w-md space-y-6">
-          {!cloudAuthAvailable ? (
-            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs leading-relaxed text-amber-950">
-              Cloud authentication is not configured for this deployment. Configure Supabase to enable accounts, or continue with the Offline Sandbox.
-            </div>
-          ) : null}
-
           {/* Quick Option A Demo Sign-in Launcher */}
           {onDemoCloudSignIn ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2.5 shadow-xs">
@@ -214,7 +199,7 @@ export function AuthScreen({
                   disabled={!cloudAuthAvailable}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Kshitiz"
+                  placeholder="e.g. Dr. Ananya Rao"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -230,7 +215,7 @@ export function AuthScreen({
                   disabled={!cloudAuthAvailable}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Kshitiz2007@gmail.com"
+                  placeholder="name@example.com"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -279,9 +264,9 @@ export function AuthScreen({
               {busy
                 ? 'Authenticating…'
                 : tab === 'signin'
-                ? 'Sign In to Option A (Supabase Cloud)'
+                ? 'Sign In to CivilEdge IAS'
                 : tab === 'signup'
-                ? 'Create Option A Cloud Account'
+                ? 'Create CivilEdge Account'
                 : tab === 'magic'
                 ? 'Send One-Click Magic Link'
                 : 'Send Password Reset Link'}

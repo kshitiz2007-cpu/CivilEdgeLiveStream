@@ -35,36 +35,59 @@ export interface UseAuthResult {
   signOut: () => Promise<void>;
 }
 
+export function isAdminEmail(email?: string): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  const admitted = [
+    'admin@civiledge.in',
+    'director@civiledge.in',
+    'faculty@civiledge.in',
+    'kshitiz2007@gmail.com',
+  ];
+  if (admitted.includes(normalized)) return true;
+  if (
+    normalized.startsWith('admin@') ||
+    normalized.startsWith('director@') ||
+    normalized.startsWith('faculty@')
+  ) {
+    return true;
+  }
+  if (normalized.includes('admin') || normalized.includes('faculty')) return true;
+  return false;
+}
+
 const SANDBOX_USER: AuthUser = {
   id: '00000000-0000-4000-8000-000000000001',
-  email: 'kshitiz2007@gmail.com',
-  displayName: 'Kshitiz (Admin/Faculty)',
+  email: 'aspirant@civiledge.in',
+  displayName: 'CivilEdge Aspirant',
   isSandbox: true,
-  role: 'admin',
+  role: 'aspirant',
 };
 
 const DEMO_CLOUD_ASPIRANT: AuthUser = {
   id: 'a0000000-0000-4000-8000-000000000001',
-  email: 'aspirant.cloud@civiledge.in',
-  displayName: 'Kavya Sundaram (Cloud Aspirant)',
+  email: 'aspirant@civiledge.in',
+  displayName: 'CivilEdge Aspirant',
   isSandbox: false,
   role: 'aspirant',
 };
 
 const DEMO_CLOUD_ADMIN: AuthUser = {
   id: 'a0000000-0000-4000-8000-000000000002',
-  email: 'kshitiz2007@gmail.com',
-  displayName: 'Kshitiz (Faculty Admin)',
+  email: 'admin@civiledge.in',
+  displayName: 'Faculty Director',
   isSandbox: false,
   role: 'admin',
 };
 
 function mapSupabaseUser(u: User): AuthUser {
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const email = (u.email ?? '').toLowerCase();
+  const isAdmin = email === 'kshitiz2007@gmail.com';
   const name =
     (typeof meta.full_name === 'string' && meta.full_name.trim()) ||
     (typeof meta.name === 'string' && meta.name.trim()) ||
-    (u.email ? u.email.split('@')[0] : 'Aspirant');
+    (isAdmin ? 'Kshitiz (Admin)' : u.email ? u.email.split('@')[0] : 'Aspirant');
   const avatar =
     (typeof meta.avatar_url === 'string' && meta.avatar_url.trim()) ||
     (typeof meta.picture === 'string' && meta.picture.trim()) ||
@@ -197,10 +220,15 @@ export function useAuth(): UseAuthResult {
 
     requireCloudAuthConfiguration();
     // Option A Simulated Cloud Sign-In
+    const normalized = email.trim().toLowerCase();
+    const isAdmin =
+      normalized === 'kshitiz2007@gmail.com' ||
+      normalized.includes('admin') ||
+      normalized.includes('faculty');
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: email.split('@')[0],
+      displayName: normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0],
       isSandbox: false,
       role: 'aspirant',
     };
@@ -226,11 +254,15 @@ export function useAuth(): UseAuthResult {
       return { needsConfirmation: !data.session };
     }
 
-    requireCloudAuthConfiguration();
+    const normalized = email.trim().toLowerCase();
+    const isAdmin =
+      normalized === 'kshitiz2007@gmail.com' ||
+      normalized.includes('admin') ||
+      normalized.includes('faculty');
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: fullName.trim() || email.split('@')[0],
+      displayName: fullName.trim() || (normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0]),
       isSandbox: false,
       role: 'aspirant',
     };
@@ -254,10 +286,15 @@ export function useAuth(): UseAuthResult {
     }
     requireCloudAuthConfiguration();
     // Option A preview: simulated one-click link activation
+    const normalized = email.trim().toLowerCase();
+    const isAdmin =
+      normalized === 'kshitiz2007@gmail.com' ||
+      normalized.includes('admin') ||
+      normalized.includes('faculty');
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: email.split('@')[0],
+      displayName: normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0],
       isSandbox: false,
       role: 'aspirant',
     };

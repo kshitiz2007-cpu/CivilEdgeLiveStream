@@ -29,8 +29,9 @@ import type {
   InfographicItem,
 } from '../types/index.ts';
 import { UploadResourceModal } from './UploadResourceModal';
+import { storeBlob } from '../lib/db/blobStore';
 
-export type AdminTab = 'quiz' | 'daily' | 'mains' | 'resources' | 'supabase';
+export type AdminTab = 'quiz' | 'daily' | 'mains' | 'resources';
 
 export interface AdminStudioModalProps {
   open?: boolean;
@@ -129,11 +130,13 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
 
   // Daily Topic Infographic Attachment
   const dailyImageInputRef = useRef<HTMLInputElement>(null);
+  const [attachedImageFile, setAttachedImageFile] = useState<File | null>(null);
   const [attachedImageUrl, setAttachedImageUrl] = useState<string | null>(null);
   const [attachedImageName, setAttachedImageName] = useState('');
   const [attachedImageCaption, setAttachedImageCaption] = useState('');
 
   const handleDailyImageFile = (file: File) => {
+    setAttachedImageFile(file);
     setAttachedImageName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
@@ -149,10 +152,14 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
     setTopicPublished(false);
     setTopicPublishError(null);
     try {
+      const infoId = `info-${Date.now()}`;
+      if (attachedImageFile) {
+        void storeBlob(`topic-info-${infoId}`, attachedImageFile);
+      }
       const infographicsList: InfographicItem[] = attachedImageUrl
         ? [
             {
-              id: `info-${Date.now()}`,
+              id: infoId,
               url: attachedImageUrl,
               title: topicTitle,
               caption: attachedImageCaption || undefined,
@@ -205,6 +212,7 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
       setTopicPublished(true);
       setTopicTitle('');
       setTopicBullets('');
+      setAttachedImageFile(null);
       setAttachedImageUrl(null);
       setAttachedImageName('');
       setAttachedImageCaption('');
@@ -392,10 +400,6 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
           </button>
 
           <button
-            id="admin-tab-supabase"
-            role="tab"
-            aria-selected={activeTab === 'supabase'}
-            aria-controls="admin-panel"
             onClick={() => setActiveTab('supabase')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'supabase'
@@ -572,21 +576,23 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
               </div>
 
               {/* Infographic Attachment */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 shadow-xs">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-amber-600" />
+                  <label className="text-xs font-semibold text-stone-300 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
                     Attach Visual Infographic / Flowchart / Map (JPG / PNG)
                   </label>
                   {attachedImageUrl && (
                     <button
                       type="button"
                       onClick={() => {
+                        setAttachedImageFile(null);
                         setAttachedImageUrl(null);
                         setAttachedImageName('');
                         setAttachedImageCaption('');
+                        if (dailyImageInputRef.current) dailyImageInputRef.current.value = '';
                       }}
-                      className="text-[11px] text-rose-700 hover:text-rose-800 font-medium cursor-pointer"
+                      className="text-[11px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
                     >
                       Remove
                     </button>
@@ -607,15 +613,15 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
 
                 {attachedImageUrl ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-amber-200">
                       <img
                         src={attachedImageUrl}
                         alt="Attached infographic"
                         className="w-16 h-16 object-cover rounded-lg border border-slate-200 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{attachedImageName}</p>
-                        <p className="text-[10px] text-emerald-700 mt-0.5">Attached to Daily Crux Carousel</p>
+                        <p className="text-xs font-semibold text-stone-200 truncate">{attachedImageName}</p>
+                        <p className="text-[10px] text-emerald-400 mt-0.5">Attached to Daily Crux Carousel</p>
                       </div>
                     </div>
                     <input
@@ -623,17 +629,18 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
                       value={attachedImageCaption}
                       onChange={(e) => setAttachedImageCaption(e.target.value)}
                       placeholder="Infographic caption or takeaway (e.g. Figure 1: Horizontal Devolution Formula)..."
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
+                      className="w-full bg-stone-900 border border-stone-700 rounded-lg p-2 text-xs text-stone-200 placeholder:text-stone-500 focus:outline-none focus:border-amber-500"
                     />
                   </div>
                 ) : (
-                  <button
-                    type="button"
+                  <div
                     onClick={() => dailyImageInputRef.current?.click()}
-                    className="w-full border border-dashed border-slate-300 hover:border-amber-500/80 rounded-lg p-3 text-center text-xs text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="w-full border border-dashed border-stone-700 hover:border-amber-500/80 rounded-lg p-3 text-center text-xs text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
                   >
-                    + Browse Image / Diagram File (.jpg, .png, .svg)
-                  </button>
+                    <Upload className="w-5 h-5 mx-auto text-amber-600" />
+                    <p className="font-bold">+ Click or drag &amp; drop image from device (.jpg, .png, .svg, .webp)</p>
+                    <p className="text-[11px] text-slate-500">Stored safely in high resolution</p>
+                  </div>
                 )}
               </div>
 
@@ -901,47 +908,6 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
                         </button>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'supabase' && (
-            <div className="space-y-6">
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50/50 via-white to-slate-50 border border-amber-200/80 shadow-xs text-slate-900">
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 mb-2">
-                  <Database className="w-4 h-4 text-amber-700" />
-                  <span>CivilEdge Supabase PostgreSQL Architecture (Option A)</span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  PostgreSQL 15+ relational schema with 10 tables, Row Level Security (RLS) policies,
-                  role-based access control (RBAC), and Supabase Storage bucket configurations.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-                {[
-                  { table: 'profiles', rls: 'Public Read / Self Update', rows: 'Aspirant profiles & study clock' },
-                  { table: 'broadcast_classes', rls: 'Public Read / Faculty Write', rows: 'Studio live seminars & timetable' },
-                  { table: 'lecture_doubts', rls: 'Public Read / Authenticated Insert', rows: 'Realtime lecture Q&A' },
-                  { table: 'lecture_notes', rls: 'Private / User Only', rows: 'Timestamped study notes' },
-                  { table: 'quiz_questions', rls: 'Public Read / Admin Write', rows: 'Bilingual Prelims MCQs' },
-                  { table: 'quizzes', rls: 'Public Read / Admin Write', rows: 'Full mock tests & drills' },
-                  { table: 'test_attempts', rls: 'Private / User Only', rows: 'Scorecards & negative marking logs' },
-                  { table: 'mains_questions', rls: 'Public Read / Admin Write', rows: 'Mains 10/15 marker questions' },
-                  { table: 'mains_submissions', rls: 'Private / User + Evaluator', rows: 'Written answers & AI feedback' },
-                  { table: 'resources', rls: 'Public Read / Admin Write', rows: 'NCERT, standard compendiums & PDFs' },
-                ].map((item, idx) => (
-                  <div key={idx} className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between text-slate-900 font-bold">
-                      <span>public.{item.table}</span>
-                      <span className="text-[10px] text-emerald-800 font-sans font-semibold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200">
-                        RLS ENABLED
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-1">{item.rows}</div>
-                    <div className="text-[10px] text-amber-700 font-semibold mt-1">Policy: {item.rls}</div>
                   </div>
                 ))}
               </div>
