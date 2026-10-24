@@ -61,12 +61,10 @@ const DEMO_CLOUD_ADMIN: AuthUser = {
 
 function mapSupabaseUser(u: User): AuthUser {
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
-  const email = (u.email ?? '').toLowerCase();
-  const isAdmin = email === 'kshitiz2007@gmail.com';
   const name =
     (typeof meta.full_name === 'string' && meta.full_name.trim()) ||
     (typeof meta.name === 'string' && meta.name.trim()) ||
-    (isAdmin ? 'Kshitiz (Admin)' : u.email ? u.email.split('@')[0] : 'Aspirant');
+    (u.email ? u.email.split('@')[0] : 'Aspirant');
   const avatar =
     (typeof meta.avatar_url === 'string' && meta.avatar_url.trim()) ||
     (typeof meta.picture === 'string' && meta.picture.trim()) ||
@@ -78,7 +76,6 @@ function mapSupabaseUser(u: User): AuthUser {
     displayName: name,
     photoURL: avatar,
     isSandbox: false,
-    role: isAdmin ? 'admin' : undefined,
   };
 }
 
@@ -92,7 +89,16 @@ function readStoredMode(): 'option_a' | 'option_b' {
   return 'option_a';
 }
 
+function requireCloudAuthConfiguration() {
+  if (!supabase && import.meta.env.PROD) {
+    throw new Error(
+      'Cloud authentication is not configured for this deployment. Use the Offline Sandbox or configure Supabase.'
+    );
+  }
+}
+
 function readSimulatedCloudUser(): AuthUser | null {
+  if (!import.meta.env.DEV) return null;
   try {
     const raw = localStorage.getItem(SIMULATED_CLOUD_SESSION_KEY);
     if (raw) return JSON.parse(raw) as AuthUser;
@@ -167,6 +173,7 @@ export function useAuth(): UseAuthResult {
   }, []);
 
   const signInWithDemoCloudUser = useCallback((role: 'aspirant' | 'admin') => {
+    if (!import.meta.env.DEV) return;
     const userToUse = role === 'admin' ? DEMO_CLOUD_ADMIN : DEMO_CLOUD_ASPIRANT;
     setCloudUser(userToUse);
     setActiveMode('option_a');
@@ -188,18 +195,14 @@ export function useAuth(): UseAuthResult {
       return;
     }
 
+    requireCloudAuthConfiguration();
     // Option A Simulated Cloud Sign-In
-    const normalized = email.trim().toLowerCase();
-    const isAdmin =
-      normalized === 'kshitiz2007@gmail.com' ||
-      normalized.includes('admin') ||
-      normalized.includes('faculty');
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0],
+      displayName: email.split('@')[0],
       isSandbox: false,
-      role: isAdmin ? 'admin' : 'aspirant',
+      role: 'aspirant',
     };
     setCloudUser(simulated);
     try {
@@ -223,17 +226,13 @@ export function useAuth(): UseAuthResult {
       return { needsConfirmation: !data.session };
     }
 
-    const normalized = email.trim().toLowerCase();
-    const isAdmin =
-      normalized === 'kshitiz2007@gmail.com' ||
-      normalized.includes('admin') ||
-      normalized.includes('faculty');
+    requireCloudAuthConfiguration();
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: fullName.trim() || (normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0]),
+      displayName: fullName.trim() || email.split('@')[0],
       isSandbox: false,
-      role: isAdmin ? 'admin' : 'aspirant',
+      role: 'aspirant',
     };
     setCloudUser(simulated);
     try {
@@ -253,18 +252,14 @@ export function useAuth(): UseAuthResult {
       if (error) throw new Error(error.message);
       return;
     }
+    requireCloudAuthConfiguration();
     // Option A preview: simulated one-click link activation
-    const normalized = email.trim().toLowerCase();
-    const isAdmin =
-      normalized === 'kshitiz2007@gmail.com' ||
-      normalized.includes('admin') ||
-      normalized.includes('faculty');
     const simulated: AuthUser = {
       id: `cloud-${Math.random().toString(36).slice(2, 10)}`,
       email: email.trim(),
-      displayName: normalized === 'kshitiz2007@gmail.com' ? 'Kshitiz (Admin)' : email.split('@')[0],
+      displayName: email.split('@')[0],
       isSandbox: false,
-      role: isAdmin ? 'admin' : 'aspirant',
+      role: 'aspirant',
     };
     setCloudUser(simulated);
     try {
@@ -283,6 +278,7 @@ export function useAuth(): UseAuthResult {
       if (error) throw new Error(error.message);
       return;
     }
+    requireCloudAuthConfiguration();
     const simulated: AuthUser = {
       id: 'g-cloud-001',
       email: 'aspirant.google@gmail.com',
@@ -304,7 +300,9 @@ export function useAuth(): UseAuthResult {
         redirectTo: window.location.origin,
       });
       if (error) throw new Error(error.message);
+      return;
     }
+    requireCloudAuthConfiguration();
   }, []);
 
   const enterSandboxMode = useCallback(() => {

@@ -308,6 +308,7 @@ CREATE OR REPLACE FUNCTION public.log_study_minutes(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   v_today DATE := CURRENT_DATE;
@@ -316,10 +317,28 @@ DECLARE
   v_mins INTEGER;
   v_result JSONB;
 BEGIN
+  IF p_minutes IS NULL OR p_minutes < 0 THEN
+    RAISE EXCEPTION 'Study minutes must be a non-negative integer'
+      USING ERRCODE = '22023';
+  END IF;
+
+  IF COALESCE(auth.role(), '') <> 'service_role'
+    AND auth.uid() IS DISTINCT FROM p_user_id
+  THEN
+    RAISE EXCEPTION 'Users may only log study time for their own profile'
+      USING ERRCODE = '42501';
+  END IF;
+
   SELECT last_study_date, streak_days, study_minutes
   INTO v_last_date, v_streak, v_mins
   FROM public.profiles
-  WHERE id = p_user_id;
+  WHERE id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Profile not found: %', p_user_id
+      USING ERRCODE = 'P0002';
+  END IF;
 
   IF v_last_date IS NULL THEN
     v_streak := 1;
@@ -348,6 +367,9 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.log_study_minutes(UUID, INTEGER) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.log_study_minutes(UUID, INTEGER) TO authenticated, service_role;
 
 -- 2. Increment Resource Download
 CREATE OR REPLACE FUNCTION public.increment_resource_download(p_resource_id UUID)

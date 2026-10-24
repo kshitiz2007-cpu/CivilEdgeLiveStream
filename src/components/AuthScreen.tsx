@@ -10,6 +10,7 @@ interface AuthScreenProps {
   onGoogleSignIn: () => Promise<void>;
   onPasswordReset: (email: string) => Promise<void>;
   onEnterSandbox: () => void;
+  cloudAuthAvailable?: boolean;
   onDemoCloudSignIn?: (role: 'aspirant' | 'admin') => void;
 }
 
@@ -20,6 +21,7 @@ export function AuthScreen({
   onGoogleSignIn,
   onPasswordReset,
   onEnterSandbox,
+  cloudAuthAvailable = true,
   onDemoCloudSignIn,
 }: AuthScreenProps) {
   const [tab, setTab] = useState<AuthTab>('signin');
@@ -34,6 +36,10 @@ export function AuthScreen({
     e.preventDefault();
     setError(null);
     setNotice(null);
+    if (!cloudAuthAvailable) {
+      setError('Cloud authentication is not configured for this deployment. Use the Offline Sandbox or configure Supabase.');
+      return;
+    }
     setBusy(true);
     try {
       if (tab === 'signin') {
@@ -119,6 +125,12 @@ export function AuthScreen({
       {/* Authentication Form Column (Option A Preview) */}
       <div className="lg:w-1/2 p-8 sm:p-12 lg:p-16 flex items-center justify-center bg-white">
         <div className="w-full max-w-md space-y-6">
+          {!cloudAuthAvailable ? (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs leading-relaxed text-amber-950">
+              Cloud authentication is not configured for this deployment. Configure Supabase to enable accounts, or continue with the Offline Sandbox.
+            </div>
+          ) : null}
+
           {/* Quick Option A Demo Sign-in Launcher */}
           {onDemoCloudSignIn ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2.5 shadow-xs">
@@ -164,6 +176,7 @@ export function AuthScreen({
               <button
                 key={t.id}
                 type="button"
+                disabled={!cloudAuthAvailable}
                 onClick={() => {
                   setTab(t.id);
                   setError(null);
@@ -198,6 +211,7 @@ export function AuthScreen({
                 <input
                   type="text"
                   required
+                  disabled={!cloudAuthAvailable}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Kshitiz"
@@ -213,6 +227,7 @@ export function AuthScreen({
                 <input
                   type="email"
                   required
+                  disabled={!cloudAuthAvailable}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Kshitiz2007@gmail.com"
@@ -228,6 +243,7 @@ export function AuthScreen({
                   {tab === 'signin' ? (
                     <button
                       type="button"
+                      disabled={!cloudAuthAvailable}
                       onClick={() => {
                         setTab('reset');
                         setError(null);
@@ -245,6 +261,7 @@ export function AuthScreen({
                     type="password"
                     required
                     minLength={6}
+                    disabled={!cloudAuthAvailable}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimum 6 characters"
@@ -256,7 +273,7 @@ export function AuthScreen({
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !cloudAuthAvailable}
               className="w-full rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
             >
               {busy
@@ -282,7 +299,7 @@ export function AuthScreen({
 
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !cloudAuthAvailable}
             onClick={async () => {
               setError(null);
               try {

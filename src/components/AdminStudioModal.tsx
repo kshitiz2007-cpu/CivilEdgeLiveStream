@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
   ShieldCheck,
@@ -14,10 +14,15 @@ import {
   Trash2,
 } from 'lucide-react';
 import { parsePipeDelimitedQuizCsv, samplePipeDelimitedCsv } from '../lib/quizCsv.ts';
-import type { DataRepo, NewQuizImportPayload, NewResourcePayload, NewTopicPayload } from '../lib/db/repo.ts';
+import type {
+  DataRepo,
+  NewMainsQuestionPayload,
+  NewQuizImportPayload,
+  NewResourcePayload,
+  NewTopicPayload,
+} from '../lib/db/repo.ts';
 import type {
   TopicOfDay,
-  MainsQuestion,
   GSBadge,
   ResourceItem,
   UserRole,
@@ -34,11 +39,12 @@ export interface AdminStudioModalProps {
   onClose: () => void;
   repo?: DataRepo;
   currentRole?: UserRole;
+  currentUserId?: string;
   resources?: ResourceItem[];
   onRefreshAll?: () => Promise<void> | void;
   onImportQuiz?: (payload: NewQuizImportPayload) => Promise<void>;
   onPublishTopic?: (topic: Partial<TopicOfDay>) => Promise<void>;
-  onPublishMainsQuestion?: (mains: Partial<MainsQuestion>) => Promise<void>;
+  onPublishMainsQuestion?: (mains: NewMainsQuestionPayload) => Promise<void>;
   onOpenBroadcastScheduler?: () => void;
 }
 
@@ -49,14 +55,21 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
   onClose,
   repo,
   resources = [],
+  currentRole,
+  currentUserId,
   onRefreshAll,
   onImportQuiz,
   onPublishTopic,
+  onPublishMainsQuestion,
   onOpenBroadcastScheduler,
 }) => {
   const visible = open ?? isOpen ?? false;
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [uploadResourceOpen, setUploadResourceOpen] = useState(false);
+
+  useEffect(() => {
+    if (visible) setActiveTab(initialTab);
+  }, [initialTab, visible]);
 
   // CSV Importer State
   const [csvText, setCsvText] = useState<string>(samplePipeDelimitedCsv);
@@ -112,6 +125,7 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
   const [topicBullets, setTopicBullets] = useState('');
   const [isPublishingTopic, setIsPublishingTopic] = useState(false);
   const [topicPublished, setTopicPublished] = useState(false);
+  const [topicPublishError, setTopicPublishError] = useState<string | null>(null);
 
   // Daily Topic Infographic Attachment
   const dailyImageInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +146,8 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
     e.preventDefault();
     if (!topicTitle.trim()) return;
     setIsPublishingTopic(true);
+    setTopicPublished(false);
+    setTopicPublishError(null);
     try {
       const infographicsList: InfographicItem[] = attachedImageUrl
         ? [
@@ -194,8 +210,89 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
       setAttachedImageCaption('');
       if (onRefreshAll) await onRefreshAll();
       setTimeout(() => setTopicPublished(false), 3000);
+    } catch (err) {
+      setTopicPublishError(err instanceof Error ? err.message : 'Failed to publish daily topic.');
     } finally {
       setIsPublishingTopic(false);
+    }
+  };
+
+  const [mainsTitle, setMainsTitle] = useState('');
+  const [mainsPaper, setMainsPaper] = useState<GSBadge>('GS-2');
+  const [mainsSubject, setMainsSubject] = useState('');
+  const [mainsPrompt, setMainsPrompt] = useState('');
+  const [mainsFrameworkIntro, setMainsFrameworkIntro] = useState('');
+  const [mainsFrameworkDimensions, setMainsFrameworkDimensions] = useState('');
+  const [mainsFrameworkReferences, setMainsFrameworkReferences] = useState('');
+  const [mainsFrameworkWayForward, setMainsFrameworkWayForward] = useState('');
+  const [mainsFrameworkConclusion, setMainsFrameworkConclusion] = useState('');
+  const [mainsMarks, setMainsMarks] = useState(10);
+  const [mainsWordLimit, setMainsWordLimit] = useState(150);
+  const [mainsTimeLimit, setMainsTimeLimit] = useState(7);
+  const [isPublishingMains, setIsPublishingMains] = useState(false);
+  const [mainsPublishStatus, setMainsPublishStatus] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  const handlePublishMains = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onPublishMainsQuestion || isPublishingMains) return;
+    if (
+      !mainsTitle.trim() ||
+      !mainsSubject.trim() ||
+      !mainsPrompt.trim() ||
+      !mainsFrameworkIntro.trim() ||
+      !mainsFrameworkConclusion.trim()
+    ) {
+      setMainsPublishStatus({
+        success: false,
+        message: 'Complete the required fields with non-empty content before publishing.',
+      });
+      return;
+    }
+    setIsPublishingMains(true);
+    setMainsPublishStatus(null);
+    try {
+      await onPublishMainsQuestion({
+        title: mainsTitle.trim(),
+        gsPaper: mainsPaper,
+        subject: mainsSubject.trim(),
+        marks: mainsMarks,
+        wordLimit: mainsWordLimit,
+        prompt: mainsPrompt.trim(),
+        suggestedTimeMin: mainsTimeLimit,
+        framework: {
+          intro: mainsFrameworkIntro.trim(),
+          dimensions: mainsFrameworkDimensions.trim()
+            ? [{
+                title: 'Key analytical dimensions',
+                points: mainsFrameworkDimensions.split('\n').map((point) => point.trim()).filter(Boolean),
+              }]
+            : [],
+          statutoryOrDataRefs: mainsFrameworkReferences.split('\n').map((ref) => ref.trim()).filter(Boolean),
+          wayForward: mainsFrameworkWayForward.split('\n').map((point) => point.trim()).filter(Boolean),
+          conclusion: mainsFrameworkConclusion.trim(),
+        },
+        modelAnswerSnippet: '',
+        publishDate: new Date().toISOString().slice(0, 10),
+      });
+      setMainsPublishStatus({ success: true, message: 'Mains question published.' });
+      setMainsTitle('');
+      setMainsSubject('');
+      setMainsPrompt('');
+      setMainsFrameworkIntro('');
+      setMainsFrameworkDimensions('');
+      setMainsFrameworkReferences('');
+      setMainsFrameworkWayForward('');
+      setMainsFrameworkConclusion('');
+    } catch (err) {
+      setMainsPublishStatus({
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to publish Mains question.',
+      });
+    } finally {
+      setIsPublishingMains(false);
     }
   };
 
@@ -229,8 +326,12 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
         </div>
 
         {/* Tab navigation */}
-        <div className="px-6 border-b border-slate-200 bg-slate-50/70 flex items-center gap-6 text-xs font-semibold overflow-x-auto">
+        <div role="tablist" aria-label="Admin studio sections" className="px-6 border-b border-slate-200 bg-slate-50/70 flex items-center gap-6 text-xs font-semibold overflow-x-auto">
           <button
+            id="admin-tab-quiz"
+            role="tab"
+            aria-selected={activeTab === 'quiz'}
+            aria-controls="admin-panel"
             onClick={() => setActiveTab('quiz')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'quiz'
@@ -243,6 +344,10 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
           </button>
 
           <button
+            id="admin-tab-daily"
+            role="tab"
+            aria-selected={activeTab === 'daily'}
+            aria-controls="admin-panel"
             onClick={() => setActiveTab('daily')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'daily'
@@ -255,6 +360,26 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
           </button>
 
           <button
+            id="admin-tab-mains"
+            onClick={() => setActiveTab('mains')}
+            aria-selected={activeTab === 'mains'}
+            role="tab"
+            aria-controls="admin-panel"
+            className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'mains'
+                ? 'border-amber-600 text-amber-900 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Publish Mains Question</span>
+          </button>
+
+          <button
+            id="admin-tab-resources"
+            role="tab"
+            aria-selected={activeTab === 'resources'}
+            aria-controls="admin-panel"
             onClick={() => setActiveTab('resources')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'resources'
@@ -267,6 +392,10 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
           </button>
 
           <button
+            id="admin-tab-supabase"
+            role="tab"
+            aria-selected={activeTab === 'supabase'}
+            aria-controls="admin-panel"
             onClick={() => setActiveTab('supabase')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'supabase'
@@ -280,7 +409,13 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div
+          id="admin-panel"
+          role="tabpanel"
+          aria-labelledby={`admin-tab-${activeTab}`}
+          tabIndex={0}
+          className="flex-1 p-6 overflow-y-auto"
+        >
           {activeTab === 'quiz' && (
             <div className="space-y-6">
               {/* CSV Parameters Form */}
@@ -439,8 +574,8 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
               {/* Infographic Attachment */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-stone-300 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-600" />
                     Attach Visual Infographic / Flowchart / Map (JPG / PNG)
                   </label>
                   {attachedImageUrl && (
@@ -451,7 +586,7 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
                         setAttachedImageName('');
                         setAttachedImageCaption('');
                       }}
-                      className="text-[11px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
+                      className="text-[11px] text-rose-700 hover:text-rose-800 font-medium cursor-pointer"
                     >
                       Remove
                     </button>
@@ -476,11 +611,11 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
                       <img
                         src={attachedImageUrl}
                         alt="Attached infographic"
-                        className="w-16 h-16 object-cover rounded-lg border border-stone-700 shrink-0"
+                        className="w-16 h-16 object-cover rounded-lg border border-slate-200 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-stone-200 truncate">{attachedImageName}</p>
-                        <p className="text-[10px] text-emerald-400 mt-0.5">Attached to Daily Crux Carousel</p>
+                        <p className="text-xs font-semibold text-slate-800 truncate">{attachedImageName}</p>
+                        <p className="text-[10px] text-emerald-700 mt-0.5">Attached to Daily Crux Carousel</p>
                       </div>
                     </div>
                     <input
@@ -488,14 +623,14 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
                       value={attachedImageCaption}
                       onChange={(e) => setAttachedImageCaption(e.target.value)}
                       placeholder="Infographic caption or takeaway (e.g. Figure 1: Horizontal Devolution Formula)..."
-                      className="w-full bg-stone-900 border border-stone-700 rounded-lg p-2 text-xs text-stone-200 placeholder:text-stone-500 focus:outline-none focus:border-amber-500"
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
                     />
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() => dailyImageInputRef.current?.click()}
-                    className="w-full border border-dashed border-stone-700 hover:border-amber-500/80 rounded-lg p-3 text-center text-xs text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+                    className="w-full border border-dashed border-slate-300 hover:border-amber-500/80 rounded-lg p-3 text-center text-xs text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   >
                     + Browse Image / Diagram File (.jpg, .png, .svg)
                   </button>
@@ -504,16 +639,208 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
 
               <div className="flex items-center justify-between pt-2">
                 {topicPublished && (
-                  <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                  <span role="status" className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4" /> Published to Today's Crux Feed with Carousel!
                   </span>
                 )}
                 <button
                   type="submit"
                   disabled={isPublishingTopic}
-                  className="ml-auto px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs shadow-md transition-all cursor-pointer"
+                  className="ml-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
                 >
                   {isPublishingTopic ? 'Publishing...' : 'Publish Daily Topic'}
+                </button>
+              </div>
+              {topicPublishError ? (
+                <p role="alert" className="text-xs font-semibold text-rose-700">{topicPublishError}</p>
+              ) : null}
+            </form>
+          )}
+
+          {activeTab === 'mains' && (
+            <form onSubmit={handlePublishMains} className="max-w-2xl space-y-4">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+                <h3 className="text-sm font-bold text-slate-900">Create a Mains writing prompt</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Published questions appear in the aspirant Mains Lab with the selected marks, word count, and writing time.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="mains-title" className="mb-1 block text-xs font-semibold text-slate-700">Question title</label>
+                <input
+                  id="mains-title"
+                  required
+                  maxLength={120}
+                  value={mainsTitle}
+                  onChange={(e) => setMainsTitle(e.target.value)}
+                  placeholder="e.g. Cooperative federalism and fiscal devolution"
+                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 shadow-xs focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label htmlFor="mains-paper" className="mb-1 block text-xs font-semibold text-slate-700">GS paper</label>
+                  <select
+                    id="mains-paper"
+                    value={mainsPaper}
+                    onChange={(e) => setMainsPaper(e.target.value as GSBadge)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  >
+                    {(['GS-1', 'GS-2', 'GS-3', 'GS-4', 'Essay'] as GSBadge[]).map((paper) => (
+                      <option key={paper} value={paper}>{paper}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="mains-marks" className="mb-1 block text-xs font-semibold text-slate-700">Marks</label>
+                  <select
+                    id="mains-marks"
+                    value={mainsMarks}
+                    onChange={(e) => {
+                      const marks = Number(e.target.value);
+                      setMainsMarks(marks);
+                      setMainsWordLimit(marks === 10 ? 150 : 250);
+                      setMainsTimeLimit(marks === 10 ? 7 : 11);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="mains-words" className="mb-1 block text-xs font-semibold text-slate-700">Word limit</label>
+                  <input
+                    id="mains-words"
+                    type="number"
+                    min={50}
+                    max={500}
+                    required
+                    value={mainsWordLimit}
+                    onChange={(e) => setMainsWordLimit(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mains-time" className="mb-1 block text-xs font-semibold text-slate-700">Time (min)</label>
+                  <input
+                    id="mains-time"
+                    type="number"
+                    min={1}
+                    max={60}
+                    required
+                    value={mainsTimeLimit}
+                    onChange={(e) => setMainsTimeLimit(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="mains-subject" className="mb-1 block text-xs font-semibold text-slate-700">Subject</label>
+                <input
+                  id="mains-subject"
+                  required
+                  maxLength={100}
+                  value={mainsSubject}
+                  onChange={(e) => setMainsSubject(e.target.value)}
+                  placeholder="e.g. Polity & Governance"
+                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="mains-prompt" className="mb-1 block text-xs font-semibold text-slate-700">Question prompt</label>
+                <textarea
+                  id="mains-prompt"
+                  required
+                  maxLength={2000}
+                  rows={4}
+                  value={mainsPrompt}
+                  onChange={(e) => setMainsPrompt(e.target.value)}
+                  placeholder="Write the complete UPSC-style question prompt."
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <legend className="px-1 text-xs font-bold text-slate-800">Answer framework</legend>
+                <p className="text-[11px] text-slate-600">Use one point per line for lists. This guidance is shown to aspirants in the Mains Lab.</p>
+                <div>
+                  <label htmlFor="mains-framework-intro" className="mb-1 block text-xs font-semibold text-slate-700">Suggested introduction</label>
+                  <textarea
+                    id="mains-framework-intro"
+                    required
+                    maxLength={800}
+                    rows={2}
+                    value={mainsFrameworkIntro}
+                    onChange={(e) => setMainsFrameworkIntro(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mains-framework-dimensions" className="mb-1 block text-xs font-semibold text-slate-700">Analytical dimensions (one per line)</label>
+                  <textarea
+                    id="mains-framework-dimensions"
+                    rows={3}
+                    value={mainsFrameworkDimensions}
+                    onChange={(e) => setMainsFrameworkDimensions(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mains-framework-references" className="mb-1 block text-xs font-semibold text-slate-700">Statutory or data anchors (one per line)</label>
+                  <textarea
+                    id="mains-framework-references"
+                    rows={2}
+                    value={mainsFrameworkReferences}
+                    onChange={(e) => setMainsFrameworkReferences(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mains-framework-way-forward" className="mb-1 block text-xs font-semibold text-slate-700">Way forward (one point per line)</label>
+                  <textarea
+                    id="mains-framework-way-forward"
+                    rows={2}
+                    value={mainsFrameworkWayForward}
+                    onChange={(e) => setMainsFrameworkWayForward(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mains-framework-conclusion" className="mb-1 block text-xs font-semibold text-slate-700">Suggested conclusion</label>
+                  <textarea
+                    id="mains-framework-conclusion"
+                    required
+                    maxLength={800}
+                    rows={2}
+                    value={mainsFrameworkConclusion}
+                    onChange={(e) => setMainsFrameworkConclusion(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </fieldset>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div aria-live="polite">
+                  {mainsPublishStatus ? (
+                    <p
+                      role={mainsPublishStatus.success ? 'status' : 'alert'}
+                      className={`text-xs font-semibold ${mainsPublishStatus.success ? 'text-emerald-700' : 'text-rose-700'}`}
+                    >
+                      {mainsPublishStatus.message}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isPublishingMains || !onPublishMainsQuestion}
+                  className="rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-xs transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPublishingMains ? 'Publishing…' : 'Publish Mains Question'}
                 </button>
               </div>
             </form>
@@ -521,19 +848,19 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
 
           {activeTab === 'resources' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-800">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <div>
-                  <h3 className="text-sm font-bold text-stone-200">
+                  <h3 className="text-sm font-bold text-slate-900">
                     Resource Library Inventory ({resources.length} items)
                   </h3>
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-slate-600">
                     NCERTs, standard references, handouts &amp; visual infographics
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setUploadResourceOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   + Upload Resource (PDF / JPG)
@@ -629,7 +956,14 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
         onClose={() => setUploadResourceOpen(false)}
         onUpload={async (payload) => {
           if (repo) {
-            await repo.uploadResource('00000000-0000-4000-8000-000000000001', true, payload);
+            if (!currentUserId) {
+              throw new Error('Unable to identify the signed-in user for this resource upload.');
+            }
+            await repo.uploadResource(
+              currentUserId,
+              currentRole === 'admin' || currentRole === 'mentor',
+              payload
+            );
           }
           if (onRefreshAll) await onRefreshAll();
         }}

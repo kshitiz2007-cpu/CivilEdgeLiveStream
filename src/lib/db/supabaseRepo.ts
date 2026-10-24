@@ -88,29 +88,23 @@ export const supabaseRepo: DataRepo = {
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    const isKshitiz = user.email?.toLowerCase() === 'kshitiz2007@gmail.com';
     if (data) {
-      const mapped = normalizeProfile(fromRow(profileSpec, data as Record<string, any>));
-      if (isKshitiz) mapped.role = 'admin';
-      return mapped;
+      return normalizeProfile(fromRow(profileSpec, data as Record<string, any>));
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
-    const { data: retryData } = await sb
+    const { data: retryData, error: retryError } = await sb
       .from('profiles')
       .select(selectColumns(profileSpec))
       .eq('id', user.id)
       .maybeSingle();
 
+    if (retryError) throw new Error(retryError.message);
     if (retryData) {
-      const mapped = normalizeProfile(fromRow(profileSpec, retryData as Record<string, any>));
-      if (isKshitiz) mapped.role = 'admin';
-      return mapped;
+      return normalizeProfile(fromRow(profileSpec, retryData as Record<string, any>));
     }
 
-    const fallback = await localRepo.getProfile(user);
-    if (isKshitiz) fallback.role = 'admin';
-    return fallback;
+    throw new Error('Your account profile is not ready yet. Please retry, or contact an administrator if the issue persists.');
   },
 
   async updateProfile(uid, patch: ProfilePatch) {
@@ -134,6 +128,7 @@ export const supabaseRepo: DataRepo = {
     if (!sb) return localRepo.logStudyMinutes(uid, addedMinutes);
 
     const { data, error } = await sb.rpc('log_study_minutes', {
+      p_user_id: uid,
       p_minutes: addedMinutes,
     });
     if (error) throw new Error(error.message);

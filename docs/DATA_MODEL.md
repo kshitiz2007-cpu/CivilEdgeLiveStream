@@ -9,7 +9,7 @@ CivilEdge IAS is an institutional-grade UPSC Civil Services Examination preparat
 
 | Entity | Table | RLS Policy | Realtime | Description |
 |---|---|---|---|---|
-| User Profile | `profiles` | Public Read / Self Update | Yes | Aspirant target parameters, streaks & study minutes |
+| User Profile | `profiles` | Authenticated Read / Self Update; admin-only role assignment | Yes | Aspirant target parameters, streaks, study minutes & protected role |
 | Broadcast Class | `broadcast_classes` | Public Read / Faculty Write | Yes | Studio Seminars (YouTube, Zoom, Google Meet, Vimeo) |
 | Lecture Doubt | `lecture_doubts` | Public Read / User Insert | Yes | Live lecture Q&A with upvoting |
 | Lecture Note | `lecture_notes` | Private to Owner | No | Timestamped study notes during classes |
@@ -26,4 +26,4 @@ CivilEdge IAS is an institutional-grade UPSC Civil Services Examination preparat
 Users can switch between Option A and Option B seamlessly:
 1. In the top sub-toolbar: 1-click switcher toggles live cloud and offline sandbox.
 2. In the Aspirant Portal drawer: Backend architecture selector.
-3. On the Auth Screen: 1-click cloud preview as Aspirant or Faculty/Admin without requiring pre-existing Supabase credentials.
+3. Development builds without Supabase can preview cloud UI as Aspirant or Faculty/Admin; production requires configured Supabase Auth for cloud access.

@@ -17,7 +17,7 @@ import { SyllabusTracker } from './components/SyllabusTracker';
 import { TimetableSection } from './components/TimetableSection';
 import { useAuth } from './hooks/useAuth';
 import { getRepo } from './lib/db';
-import type { DocumentOpenPayload } from './lib/db/repo';
+import type { DocumentOpenPayload, NewMainsQuestionPayload } from './lib/db/repo';
 import { isSupabaseConfigured } from './lib/supabase';
 import type {
   BroadcastClass,
@@ -146,7 +146,12 @@ export function App() {
         onGoogleSignIn={auth.signInWithGoogle}
         onPasswordReset={auth.sendPasswordReset}
         onEnterSandbox={auth.enterSandboxMode}
-        onDemoCloudSignIn={auth.signInWithDemoCloudUser}
+        cloudAuthAvailable={isSupabaseConfigured || import.meta.env.DEV}
+        onDemoCloudSignIn={
+          import.meta.env.DEV && !isSupabaseConfigured
+            ? auth.signInWithDemoCloudUser
+            : undefined
+        }
       />
     );
   }
@@ -188,7 +193,7 @@ export function App() {
             <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 shadow-xs">
               <button
                 type="button"
-                onClick={() => auth.signInWithDemoCloudUser('aspirant')}
+                onClick={auth.setModeOptionA}
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-semibold text-xs transition-all cursor-pointer ${
                   auth.isCloudAuth
                     ? 'bg-white border border-emerald-400 text-emerald-800 shadow-xs'
@@ -302,7 +307,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setAdminInitialTab('supabase');
+                  setAdminInitialTab('quiz');
                   setAdminStudioOpen(true);
                 }}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-800 hover:text-amber-800 shadow-xs cursor-pointer"
@@ -532,8 +537,13 @@ export function App() {
         onClose={() => setAdminStudioOpen(false)}
         repo={repo}
         currentRole={profile.role}
+        currentUserId={profile.uid}
         resources={resources}
         onRefreshAll={hydrateWorkspace}
+        onPublishMainsQuestion={async (payload: NewMainsQuestionPayload) => {
+          await repo.createMainsQuestion(payload);
+          setMainsQuestions(await repo.listMainsQuestions());
+        }}
       />
 
       <BroadcastSchedulerModal
