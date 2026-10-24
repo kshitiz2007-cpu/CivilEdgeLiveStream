@@ -6,6 +6,7 @@ import {
   normalizeProfile,
 } from '../format';
 import { getAccessToken, isSupabaseConfigured, supabase } from '../supabase';
+import { isAdminEmail } from '../../hooks/useAuth';
 import { localRepo } from './localRepo';
 import type {
   AdminAuditEntry,
@@ -88,10 +89,10 @@ export const supabaseRepo: DataRepo = {
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    const isKshitiz = user.email?.toLowerCase() === 'kshitiz2007@gmail.com';
+    const isAdmin = isAdminEmail(user.email) || user.role === 'admin';
     if (data) {
       const mapped = normalizeProfile(fromRow(profileSpec, data as Record<string, any>));
-      if (isKshitiz) mapped.role = 'admin';
+      if (isAdmin) mapped.role = 'admin';
       return mapped;
     }
 
@@ -104,12 +105,12 @@ export const supabaseRepo: DataRepo = {
 
     if (retryData) {
       const mapped = normalizeProfile(fromRow(profileSpec, retryData as Record<string, any>));
-      if (isKshitiz) mapped.role = 'admin';
+      if (isAdmin) mapped.role = 'admin';
       return mapped;
     }
 
     const fallback = await localRepo.getProfile(user);
-    if (isKshitiz) fallback.role = 'admin';
+    if (isAdmin) fallback.role = 'admin';
     return fallback;
   },
 
@@ -604,14 +605,50 @@ export const supabaseRepo: DataRepo = {
     const sb = client();
     if (!sb) return localRepo.listSubmissions(userId);
 
+    const query = sb.from('mains_submissions').select(selectColumns(mainsSubmissionSpec));
+    if (userId) query.eq('user_id', userId);
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Record<string, any>[]).map((r) => fromRow(mainsSubmissionSpec, r));
+  },
+
+  async listAllSubmissions() {
+    const sb = client();
+    if (!sb) return localRepo.listAllSubmissions ? localRepo.listAllSubmissions() : localRepo.listSubmissions('');
+
     const { data, error } = await sb
       .from('mains_submissions')
       .select(selectColumns(mainsSubmissionSpec))
-      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(error.message);
     return ((data ?? []) as Record<string, any>[]).map((r) => fromRow(mainsSubmissionSpec, r));
+  },
+
+  async gradeMainsSubmission(submissionId, score, feedback, evaluation) {
+    const sb = client();
+    if (!sb) {
+      if (localRepo.gradeMainsSubmission) {
+        return localRepo.gradeMainsSubmission(submissionId, score, feedback, evaluation);
+      }
+      throw new Error('Grading not supported in localRepo fallback.');
+    }
+
+    const { data, error } = await sb
+      .from('mains_submissions')
+      .update({
+        score,
+        feedback,
+        status: 'evaluated',
+        ...(evaluation ? { evaluation } : {}),
+      })
+      .eq('id', submissionId)
+      .select(selectColumns(mainsSubmissionSpec))
+      .single();
+
+    if (error) throw new Error(error.message);
+    return fromRow(mainsSubmissionSpec, data as Record<string, any>);
   },
 
   async submitAndEvaluateMains(userId, question, answerText) {
@@ -785,58 +822,76 @@ export const supabaseRepo: DataRepo = {
     const sb = client();
     if (!sb) return localRepo.listResources(viewerId, isStaff);
 
-    const { data, error } = await sb
-      .from('resources')
-      .select(selectColumns(resourceSpec))
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await sb
+        .from('resources')
+        .select(selectColumns(resourceSpec))
+        .order('created_at', { ascending: false });
 
-    if (error) throw new Error(error.message);
-    return ((data ?? []) as Record<string, any>[]).map((r) => fromRow(resourceSpec, r));
+      if (error) {
+        console.warn('Supabase resources table not available, using local store:', error.message);
+        return localRepo.listResources(viewerId, isStaff);
+      }
+      return ((data ?? []) as Record<string, any>[]).map((r) => fromRow(resourceSpec, r));
+    } catch {
+      return localRepo.listResources(viewerId, isStaff);
+    }
   },
 
   async uploadResource(viewerId, isStaff, payload: NewResourcePayload) {
     const sb = client();
     if (!sb) return localRepo.uploadResource(viewerId, isStaff, payload);
 
-    let filePath: string | undefined;
-    const sizeBytes = payload.file?.size ?? (payload.fileData ? Math.round(payload.fileData.length * 0.75) : 1_048_576);
+    try {
+      let filePath: string | undefined;
+      const sizeBytes = payload.file?.size ?? (payload.fileData ? Math.round(payload.fileData.length * 0.75) : 1_048_576);
 
-    if (payload.file) {
-      const storagePath = `${viewerId}/${Date.now()}-${sanitizeFilename(payload.file.name)}`;
-      const contentType =
-        payload.file.type ||
-        (payload.format === 'jpg' ? 'image/jpeg' : payload.format === 'png' ? 'image/png' : 'application/pdf');
-      const { error: upErr } = await sb.storage.from('resources').upload(storagePath, payload.file, {
-        upsert: false,
-        contentType,
-      });
-      if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
-      filePath = storagePath;
+      if (payload.file) {
+        const storagePath = `${viewerId}/${Date.now()}-${sanitizeFilename(payload.file.name)}`;
+        const contentType =
+          payload.file.type ||
+          (payload.format === 'jpg' ? 'image/jpeg' : payload.format === 'png' ? 'image/png' : 'application/pdf');
+        const { error: upErr } = await sb.storage.from('resources').upload(storagePath, payload.file, {
+          upsert: false,
+          contentType,
+        });
+        if (upErr) {
+          console.warn('Supabase storage upload error, saving to local store:', upErr.message);
+          return localRepo.uploadResource(viewerId, isStaff, payload);
+        }
+        filePath = storagePath;
+      }
+
+      const insertRow = {
+        title: payload.title.trim(),
+        category: payload.category,
+        gs_paper: payload.gsPaper,
+        format: payload.format,
+        size_bytes: sizeBytes,
+        pages: payload.pages,
+        author_or_source: payload.authorOrSource.trim(),
+        summary: payload.summary.trim(),
+        topics_covered: payload.topicsCovered,
+        ...(filePath ? { file_path: filePath } : {}),
+      };
+
+      const { data, error } = await sb
+        .from('resources')
+        .insert(insertRow)
+        .select(selectColumns(resourceSpec))
+        .single();
+
+      if (error) {
+        console.warn('Supabase resources insert error, falling back to local store:', error.message);
+        return localRepo.uploadResource(viewerId, isStaff, payload);
+      }
+      const item = fromRow(resourceSpec, data as Record<string, any>);
+      if (payload.fileData) item.fileData = payload.fileData;
+      return item;
+    } catch (err) {
+      console.warn('Supabase resource upload failed, falling back to local store:', err);
+      return localRepo.uploadResource(viewerId, isStaff, payload);
     }
-
-    const insertRow = {
-      title: payload.title.trim(),
-      category: payload.category,
-      gs_paper: payload.gsPaper,
-      format: payload.format,
-      size_bytes: sizeBytes,
-      pages: payload.pages,
-      author_or_source: payload.authorOrSource.trim(),
-      summary: payload.summary.trim(),
-      topics_covered: payload.topicsCovered,
-      ...(filePath ? { file_path: filePath } : {}),
-    };
-
-    const { data, error } = await sb
-      .from('resources')
-      .insert(insertRow)
-      .select(selectColumns(resourceSpec))
-      .single();
-
-    if (error) throw new Error(error.message);
-    const item = fromRow(resourceSpec, data as Record<string, any>);
-    if (payload.fileData) item.fileData = payload.fileData;
-    return item;
   },
 
   async setResourceModeration(id, status) {

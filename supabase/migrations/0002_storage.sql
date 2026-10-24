@@ -17,10 +17,18 @@ CREATE POLICY "Handouts are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'handouts');
 
--- Resources: Public read
+-- Resources: Public read and upload
 CREATE POLICY "Resources are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'resources');
+
+CREATE POLICY "Allow authenticated or public upload to resources"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'resources');
+
+CREATE POLICY "Allow authenticated or public upload to handouts"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'handouts');
 
 -- Avatars: Public read, authenticated user upload
 CREATE POLICY "Avatars are publicly accessible"

@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 
-export type WorkspaceTab = 'crux' | 'classroom' | 'prelims' | 'mains' | 'hub';
+export type WorkspaceTab = 'crux' | 'classroom' | 'prelims' | 'mains' | 'hub' | 'admin';
 
 interface HeaderProps {
   activeTab: WorkspaceTab;
   onSelectTab: (tab: WorkspaceTab) => void;
   onOpenPortal: () => void;
   userDisplayName: string;
+  isStaff?: boolean;
 }
 
-const NAV_ITEMS: { id: WorkspaceTab; label: string }[] = [
+const BASE_NAV_ITEMS: { id: WorkspaceTab; label: string }[] = [
   { id: 'crux', label: 'Daily Crux' },
   { id: 'classroom', label: 'Classroom' },
   { id: 'prelims', label: 'Prelims' },
@@ -18,8 +19,12 @@ const NAV_ITEMS: { id: WorkspaceTab; label: string }[] = [
   { id: 'hub', label: 'Study Hub' },
 ];
 
-export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName }: HeaderProps) {
+export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName, isStaff }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navItems = isStaff
+    ? [...BASE_NAV_ITEMS, { id: 'admin' as const, label: 'Admin Dashboard' }]
+    : BASE_NAV_ITEMS;
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/90 backdrop-blur-md shadow-xs">
@@ -33,7 +38,7 @@ export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName }
         </button>
 
         <nav aria-label="Primary" className="hidden md:flex items-center gap-7">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
@@ -46,6 +51,11 @@ export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName }
                 }`}
               >
                 {item.label}
+                {item.id === 'admin' ? (
+                  <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                    Pro
+                  </span>
+                ) : null}
                 {isActive ? (
                   <span className="absolute inset-x-0 bottom-0 h-0.5 bg-amber-600 rounded-full" />
                 ) : null}
@@ -61,7 +71,7 @@ export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName }
             title={`Signed in as ${userDisplayName}`}
             className="rounded-xl bg-amber-500 px-4 py-2 text-xs sm:text-sm font-bold text-slate-950 whitespace-nowrap hover:bg-amber-400 shadow-xs transition-all cursor-pointer"
           >
-            Aspirant Portal
+            {isStaff ? 'Faculty Portal' : 'Aspirant Portal'}
           </button>
 
           <button
@@ -77,7 +87,7 @@ export function Header({ activeTab, onSelectTab, onOpenPortal, userDisplayName }
 
       {mobileMenuOpen ? (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1 shadow-lg">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button

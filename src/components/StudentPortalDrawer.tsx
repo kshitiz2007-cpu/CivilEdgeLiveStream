@@ -12,7 +12,9 @@ import {
   BookOpen,
   Cloud,
   HardDrive,
+  Shield,
   ShieldCheck,
+  CheckCircle2,
   LogOut,
   ChevronRight,
   Sparkles,
@@ -146,72 +148,53 @@ export const StudentPortalDrawer: React.FC<StudentPortalDrawerProps> = ({
 
         {/* Content Body */}
         <div className="flex-1 p-6 space-y-6">
-          {/* ARCHITECTURE PREVIEW SWITCHER (Option A ↔ Option B) */}
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                Backend Architecture Mode
-              </span>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                  activeMode === 'option_a'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-900 border border-amber-200'
-                }`}
-              >
-                {activeMode === 'option_a' ? 'Option A: Cloud Active' : 'Option B: Sandbox Active'}
-              </span>
+          {/* Status & Administration Card */}
+          {profile.role === 'admin' || profile.role === 'mentor' ? (
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 via-white to-slate-50 border border-amber-200/90 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  Academy Faculty &amp; Admin Suite
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  Director Access
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Full administrative authority over Live Seminars, Daily Crux editorials, Prelims MCQ banks, Mains grading, and the academic document vault.
+              </p>
+
+              {onOpenAdminStudio && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAdminStudio();
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Open Academy Admin Dashboard</span>
+                </button>
+              )}
             </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Toggle between Supabase Cloud and Offline Local Sandbox at any time:
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onSwitchMode) onSwitchMode('option_a');
-                  else if (onExitSandboxToCloud) onExitSandboxToCloud();
-                }}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  isCloud
-                    ? 'bg-amber-50/80 border-amber-400 text-slate-900 shadow-xs ring-1 ring-amber-400'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
-                  <Cloud className="w-4 h-4 text-emerald-600" />
-                  <span>Option A</span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Supabase Cloud (PostgreSQL, Auth &amp; Storage)
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (onSwitchMode) onSwitchMode('option_b');
-                  else if (onSwitchSandboxRole) void onSwitchSandboxRole('aspirant');
-                }}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  !isCloud
-                    ? 'bg-amber-50/80 border-amber-400 text-slate-900 shadow-xs ring-1 ring-amber-400'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
-                  <HardDrive className="w-4 h-4 text-amber-600" />
-                  <span>Option B</span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Offline Sandbox (Instant local storage)
-                </div>
-              </button>
+          ) : (
+            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Aspirant Cohort Status
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Active Enrollment
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                UPSC Civil Services Examination 2026–27 cohort. All lecture notes, study minutes, and answer writing evaluations are synchronized across your devices.
+              </p>
             </div>
-          </div>
+          )}
 
           {/* Daily Study Streak & Goal */}
           <div className="grid grid-cols-2 gap-3">

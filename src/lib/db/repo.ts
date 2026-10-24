@@ -163,6 +163,13 @@ export interface DataRepo {
   createMainsQuestion(payload: NewMainsQuestionPayload): Promise<MainsQuestion>;
   deleteMainsQuestion(id: string): Promise<void>;
   listSubmissions(userId: string): Promise<MainsSubmissionRecord[]>;
+  listAllSubmissions?(): Promise<MainsSubmissionRecord[]>;
+  gradeMainsSubmission?(
+    submissionId: string,
+    score: number,
+    feedback: string,
+    evaluation?: { strengths: string[]; improvements: string[] }
+  ): Promise<MainsSubmissionRecord>;
   submitAndEvaluateMains(
     userId: string,
     question: MainsQuestion,

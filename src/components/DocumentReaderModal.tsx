@@ -33,7 +33,15 @@ export function DocumentReaderModal({ doc, onClose }: DocumentReaderModalProps) 
   const imageSrc = doc.imageUrl || (doc.signedUrl?.startsWith('data:image') ? doc.signedUrl : null);
 
   const handleDownload = () => {
-    if (isImage && imageSrc) {
+    if (doc.signedUrl) {
+      const link = document.createElement('a');
+      link.href = doc.signedUrl;
+      const cleanName = doc.downloadFilename?.replace(/\.md$/, '') || `${doc.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      link.download = cleanName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (isImage && imageSrc) {
       const link = document.createElement('a');
       link.href = imageSrc;
       link.download = doc.downloadFilename || 'Academic_Infographic.jpg';
